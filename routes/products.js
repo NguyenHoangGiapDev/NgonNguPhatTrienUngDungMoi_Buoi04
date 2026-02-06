@@ -60,34 +60,42 @@ router.post('/', function (req, res, next) {
     }),
     price: req.body.price,
     description: req.body.description,
-    category: req.body.categoryId,
+    // accept either a full category object or a categoryId
+    category: req.body.category || (req.body.categoryId ? { id: req.body.categoryId } : undefined),
     images: req.body.images,
     creationAt: new Date(Date.now()),
     updatedAt: new Date(Date.now())
   }
-  res.send(newObj);
+  // persist into in-memory data array
+  data.push(newObj);
+  res.status(201).send(newObj);
 })
 router.put('/:id', function (req, res, next) {
-  let result = data.find(
-    function (e) {
-      return e.id == req.params.id
-    }
-  );
-  if (result) {
-    //res.status(200).send(result)
-    let body = req.body;
-    let keys = Object.keys(body);
-    for (const key of keys) {
-      if (result[key]) {
-        result[key] = body[key];
-      }
-    }
-    res.send(result)
-  } else {
-    res.status(404).send({
-      message: "ID NOT FOUND"
-    })
+  const id = Number(req.params.id);
+  let result = data.find(function (e) { return e.id === id && !e.isDeleted });
+  if (!result) {
+    return res.status(404).send({ message: "ID NOT FOUND" })
   }
+  const body = req.body || {};
+  // don't allow changing id or creationAt
+  const forbidden = ['id', 'creationAt'];
+  for (const key of Object.keys(body)) {
+    if (forbidden.includes(key)) continue;
+    // update slug automatically when title changes
+    if (key === 'title') {
+      result.title = body.title;
+      result.slug = slugify(body.title, { replacement: '-', lower: true, locale: 'vi' });
+      continue;
+    }
+    // allow replacing category by object or id
+    if (key === 'categoryId') {
+      result.category = { id: body[key] };
+      continue;
+    }
+    result[key] = body[key];
+  }
+  result.updatedAt = new Date(Date.now());
+  res.status(200).send(result);
 })
 router.delete('/:id', function (req, res, next) {
   let result = data.find(
@@ -98,7 +106,8 @@ router.delete('/:id', function (req, res, next) {
   if (result) {
     //res.status(200).send(result)
     result.isDeleted = true;
-    res.send(result)
+    result.updatedAt = new Date(Date.now());
+    res.status(200).send(result)
   } else {
     res.status(404).send({
       message: "ID NOT FOUND"

@@ -1,0 +1,13 @@
+doctype html
+html
+  head
+    meta(charset='utf-8')
+    title Error
+  body
+    h1 Error
+    if message
+      h2 #{message}
+    if error && error.status
+      h3 Status: #{error.status}
+    if error && error.stack
+      pre #{error.stack}
